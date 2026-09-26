@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photo Folder Compare</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #171a21;
+      --card2: #1e222b;
+      --text: #f5f7fb;
+      --muted: #9aa4b2;
+      --border: #2b313c;
+      --accent: #4f8cff;
+      --ok: #38c172;
+      --warn: #f6c344;
+      --danger: #ff5d5d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #0d0f13, #141820);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 18px 60px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -1px;
+    }
+    .lead {
+      color: var(--muted);
+      margin: 0 0 26px;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: rgba(23,26,33,.95);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 35px rgba(0,0,0,.22);
+    }
+    .folder-title {
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    .folder-desc {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    input[type=file] { display: none; }
+    .pick {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      color: var(--text);
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: .15s ease;
+    }
+    .pick:hover { border-color: #536174; transform: translateY(-1px); }
+    .folder-meta {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      word-break: break-word;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin: 18px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 0;
+      border-radius: 12px;
+      min-height: 48px;
+      padding: 0 20px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .primary { background: var(--accent); color: white; }
+    .secondary { background: #252b35; color: white; border: 1px solid var(--border); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .progress-wrap {
+      margin-top: 12px;
+      display: none;
+    }
+    .progress {
+      height: 10px;
+      background: #252a33;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width .12s linear;
+    }
+    .status { margin-top: 8px; color: var(--muted); font-size: 14px; }
+    .summary {
+      display: none;
+      margin-top: 18px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    .stat {
+      background: #12151b;
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 14px;
+    }
+    .stat strong { display: block; font-size: 28px; margin-bottom: 4px; }
+    .stat span { color: var(--muted); font-size: 13px; }
+    .verdict {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      line-height: 1.5;
+    }
+    .ok { background: rgba(56,193,114,.08); border-color: rgba(56,193,114,.35); }
+    .warn { background: rgba(246,195,68,.08); border-color: rgba(246,195,68,.35); }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      background: #20252e;
+      color: #dce3ec;
+      padding: 10px 14px;
+      min-height: auto;
+      font-size: 14px;
+    }
+    .tab.active { background: #344056; }
+    .panel {
+      margin-top: 10px;
+      background: #101319;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      max-height: 420px;
+      overflow: auto;
+      display: none;
+    }
+    .panel.active { display: block; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 1px solid #252a33;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #181c23;
+      z-index: 1;
+    }
+    .badge {
+      display: inline-block;
+      border: 1px solid #394251;
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: #cbd4e1;
+      font-size: 12px;
+    }
+    .note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    code {
+      background: #1f242d;
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 7px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
+zipBtn.addEventListener("click", async () => {
+  if (!lastResult || !lastResult.onlyB.length) return;
+
+  if (typeof JSZip === "undefined") {
+    alert("ZIP biblioteka nije učitana. Proveri internet konekciju i osveži stranicu.");
+    return;
+  }
+
+  const originalText = zipBtn.textContent;
+  zipBtn.disabled = true;
+  compareBtn.disabled = true;
+  csvBtn.disabled = true;
+  progressWrap.style.display = "block";
+  bar.style.width = "0%";
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder("RAZLIKA_B_BEZ_A");
+
+    for (let i = 0; i < lastResult.onlyB.length; i++) {
+      const item = lastResult.onlyB[i];
+      statusEl.textContent = `Pakujem ${i + 1}/${lastResult.onlyB.length}: ${item.name}`;
+      folder.file(item.name, item.file);
+
+      const pct = Math.round(((i + 1) / lastResult.onlyB.length) * 60);
+      bar.style.width = pct + "%";
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    statusEl.textContent = "Kreiram ZIP fajl...";
+    const blob = await zip.generateAsync(
+      { type: "blob", compression: "STORE" },
+      meta => {
+        const pct = 60 + Math.round(meta.percent * 0.4);
+        bar.style.width = Math.min(pct, 100) + "%";
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `RAZLIKA_B_BEZ_A_${lastResult.onlyB.length}_slika.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    bar.style.width = "100%";
+    statusEl.textContent = `Gotovo — preuzeto ${lastResult.onlyB.length} fotografija koje postoje samo u Folderu B.`;
+  } catch (e) {
+    console.error(e);
+    alert("Greška pri pravljenju ZIP-a: " + e.message);
+    statusEl.textContent = "Greška pri pravljenju ZIP-a.";
+  } finally {
+    zipBtn.textContent = originalText;
+    zipBtn.disabled = !(lastResult && lastResult.onlyB.length);
+    compareBtn.disabled = !(filesA.length && filesB.length);
+    csvBtn.disabled = !lastResult;
+  }
+});
+
+</script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Photo Folder Compare</h1>
+  <p class="lead">
+    Uporedi dva foldera sa fotografijama i vidi koje slike postoje u oba, koje su samo u prvom,
+    a koje samo u drugom. Sve se obrađuje lokalno u browseru — fotografije se ne uploaduju na server.
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="folder-title">Folder A</div>
+      <div class="folder-desc">Na primer: ranijih 50 fotografija</div>
+      <label class="pick" for="folderA">Izaberi Folder A</label>
+      <input id="folderA" type="file" webkitdirectory directory multiple />
+      <div id="metaA" class="folder-meta">Nije izabran folder.</div>
+    </div>
+
+    <div class="card">
+      <div class="folder-title">Folder B</div>
+      <div class="folder-desc">Na primer: novih 184 fotografije</div>
+      <label class="pick" for="folderB">Izaberi Folder B</label>
+      <input id="folderB" type="file" webkitdirectory directory multiple />
+      <div id="metaB" class="folder-meta">Nije izabran folder.</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="compareBtn" class="primary" disabled>UPOREDI FOLDERE</button>
+    <button id="csvBtn" class="secondary" disabled>Sačuvaj CSV izveštaj</button>
+    <button id="zipBtn" class="secondary" disabled>Preuzmi razliku (B bez A) kao ZIP</button>
+  </div>
+
+  <div id="progressWrap" class="card progress-wrap">
+    <div class="progress"><div id="bar" class="bar"></div></div>
+    <div id="status" class="status">Spremno.</div>
+  </div>
+
+  <div id="summary" class="card summary">
+    <h2 style="margin:0;">Rezultat</h2>
+
+    <div class="stats">
+      <div class="stat"><strong id="countA">0</strong><span>slika u Folderu A</span></div>
+      <div class="stat"><strong id="countB">0</strong><span>slika u Folderu B</span></div>
+      <div class="stat"><strong id="sameCount">0</strong><span>istih slika</span></div>
+      <div class="stat"><strong id="missingCount">0</strong><span>iz A nema u B</span></div>
+    </div>
+
+    <div id="verdict" class="verdict"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="same">Iste u oba</button>
+      <button class="tab" data-tab="onlyA">Samo u A</button>
+      <button class="tab" data-tab="onlyB">Samo u B</button>
+    </div>
+
+    <div id="same" class="panel active"></div>
+    <div id="onlyA" class="panel"></div>
+    <div id="onlyB" class="panel"></div>
+
+    <p class="note">
+      Poređenje koristi SHA-256 sadržaj fajla, ne samo naziv. Ako je ista fotografija samo preimenovana,
+      biće prepoznata kao ista. Dugme <strong>„Preuzmi razliku (B bez A) kao ZIP“</strong> pravi ZIP
+      samo od fotografija koje postoje u Folderu B, a ne postoje u Folderu A. Ako je fotografija ponovo
+      eksportovana, kompresovana ili izmenjena, fajl više nije potpuno identičan i biće prikazan kao različit.
+    </p>
+  </div>
+</div>
+
+<script>
+const IMAGE_EXTS = new Set([
+  "jpg","jpeg","png","tif","tiff","heic","heif","webp","bmp",
+  "nef","cr2","cr3","arw","dng"
+]);
+
+const folderA = document.getElementById("folderA");
+const folderB = document.getElementById("folderB");
+const metaA = document.getElementById("metaA");
+const metaB = document.getElementById("metaB");
+const compareBtn = document.getElementById("compareBtn");
+const csvBtn = document.getElementById("csvBtn");
+const zipBtn = document.getElementById("zipBtn");
+const progressWrap = document.getElementById("progressWrap");
+const bar = document.getElementById("bar");
+const statusEl = document.getElementById("status");
+const summary = document.getElementById("summary");
+const verdict = document.getElementById("verdict");
+
+let filesA = [];
+let filesB = [];
+let lastResult = null;
+
+function isImage(file) {
+  const parts = file.name.toLowerCase().split(".");
+  const ext = parts.length > 1 ? parts.pop() : "";
+  return IMAGE_EXTS.has(ext);
+}
+
+function selectedFiles(input) {
+  return Array.from(input.files).filter(isImage);
+}
+
+function folderName(files) {
+  if (!files.length) return "";
+  const p = files[0].webkitRelativePath || "";
+  return p.split("/")[0] || "Izabrani folder";
+}
+
+function updateFolder(input, meta, side) {
+  const arr = selectedFiles(input);
+  if (side === "A") filesA = arr;
+  else filesB = arr;
+
+  if (!arr.length) {
+    meta.textContent = "Nema podržanih fotografija u izabranom folderu.";
+  } else {
+    meta.innerHTML = `<strong>${escapeHtml(folderName(arr))}</strong><br>${arr.length} fotografija`;
+  }
+
+  compareBtn.disabled = !(filesA.length && filesB.length);
+  summary.style.display = "none";
+  csvBtn.disabled = true;
+  zipBtn.disabled = true;
+}
+
+folderA.addEventListener("change", () => updateFolder(folderA, metaA, "A"));
+folderB.addEventListener("change", () => updateFolder(folderB, metaB, "B"));
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  })[c]);
+}
+
+async function sha256(file) {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function addToMap(map, hash, item) {
+  if (!map.has(hash)) map.set(hash, []);
+  map.get(hash).push(item);
+}
+
+async function hashFiles(files, map, label, progressState) {
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    statusEl.textContent = `${label}: ${f.name} (${i + 1}/${files.length})`;
+    const hash = await sha256(f);
+
+    addToMap(map, hash, {
+      name: f.name,
+      path: f.webkitRelativePath || f.name,
+      size: f.size,
+      file: f
+    });
+
+    progressState.done++;
+    const pct = Math.round((progressState.done / progressState.total) * 100);
+    bar.style.width = pct + "%";
+
+    await new Promise(r => setTimeout(r, 0));
+  }
+}
+
+compareBtn.addEventListener("click", async () => {
+  compareBtn.disabled = true;
+  csvBtn.disabled = true;
+  zipBtn.disabled = true;
+  summary.style.display = "none";
+  progressWrap.style.display = "block";
+  bar.style.width = "0%";
+
+  try {
+    const mapA = new Map();
+    const mapB = new Map();
+    const progressState = { done: 0, total: filesA.length + filesB.length };
+
+    await hashFiles(filesA, mapA, "Obrađujem Folder A", progressState);
+    await hashFiles(filesB, mapB, "Obrađujem Folder B", progressState);
+
+    const same = [];
+    const onlyA = [];
+    const onlyB = [];
+
+    for (const [hash, aItems] of mapA.entries()) {
+      if (mapB.has(hash)) {
+        same.push({ hash, a: aItems, b: mapB.get(hash) });
+      } else {
+        for (const item of aItems) onlyA.push(item);
+      }
+    }
+
+    for (const [hash, bItems] of mapB.entries()) {
+      if (!mapA.has(hash)) {
+        for (const item of bItems) onlyB.push(item);
+      }
+    }
+
+    same.sort((x,y) => x.a[0].name.localeCompare(y.a[0].name));
+    onlyA.sort((x,y) => x.name.localeCompare(y.name));
+    onlyB.sort((x,y) => x.name.localeCompare(y.name));
+
+    lastResult = {
+      folderA: folderName(filesA),
+      folderB: folderName(filesB),
+      countA: filesA.length,
+      countB: filesB.length,
+      same,
+      onlyA,
+      onlyB
+    };
+
+    renderResult(lastResult);
+    statusEl.textContent = "Gotovo.";
+    bar.style.width = "100%";
+    csvBtn.disabled = false;
+    zipBtn.disabled = lastResult.onlyB.length === 0;
+
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Greška: " + e.message;
+    alert("Došlo je do greške pri poređenju: " + e.message);
+  } finally {
+    compareBtn.disabled = !(filesA.length && filesB.length);
+  }
+});
+
+function renderResult(r) {
+  document.getElementById("countA").textContent = r.countA;
+  document.getElementById("countB").textContent = r.countB;
+  document.getElementById("sameCount").textContent = r.same.length;
+  document.getElementById("missingCount").textContent = r.onlyA.length;
+
+  if (r.onlyA.length === 0) {
+    verdict.className = "verdict ok";
+    verdict.innerHTML =
+      `✅ <strong>Sve fotografije iz Foldera A postoje u Folderu B.</strong><br>` +
+      `To znači da među fotografijama iz foldera <strong>${escapeHtml(r.folderB)}</strong> ` +
+      `imaš sve fotografije iz foldera <strong>${escapeHtml(r.folderA)}</strong>.`;
+  } else if (r.same.length === 0) {
+    verdict.className = "verdict warn";
+    verdict.innerHTML =
+      `⚠️ <strong>Nisam pronašao nijednu potpuno identičnu fotografiju između dva foldera.</strong>`;
+  } else {
+    verdict.className = "verdict warn";
+    verdict.innerHTML =
+      `⚠️ Pronađeno je <strong>${r.same.length}</strong> istih fotografija, ali ` +
+      `<strong>${r.onlyA.length}</strong> fotografija iz Foldera A ne postoji u Folderu B.`;
+  }
+
+  renderSame(r.same);
+  renderList("onlyA", r.onlyA, "Fotografija iz Foldera A");
+  renderList("onlyB", r.onlyB, "Fotografija iz Foldera B");
+
+  summary.style.display = "block";
+  summary.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderSame(items) {
+  const el = document.getElementById("same");
+  if (!items.length) {
+    el.innerHTML = `<div style="padding:16px;color:#9aa4b2;">Nema identičnih fotografija.</div>`;
+    return;
+  }
+  let rows = "";
+  items.forEach((x, i) => {
+    rows += `<tr>
+      <td>${i + 1}</td>
+      <td>${x.a.map(v => escapeHtml(v.path)).join("<br>")}</td>
+      <td>${x.b.map(v => escapeHtml(v.path)).join("<br>")}</td>
+    </tr>`;
+  });
+  el.innerHTML = `<table>
+    <thead><tr><th>#</th><th>Folder A</th><th>Folder B</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderList(id, items, heading) {
+  const el = document.getElementById(id);
+  if (!items.length) {
+    el.innerHTML = `<div style="padding:16px;color:#9aa4b2;">Nema fotografija u ovoj grupi.</div>`;
+    return;
+  }
+  let rows = "";
+  items.forEach((x, i) => {
+    rows += `<tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(x.path)}</td>
+      <td>${formatBytes(x.size)}</td>
+    </tr>`;
+  });
+  el.innerHTML = `<table>
+    <thead><tr><th>#</th><th>${heading}</th><th>Veličina</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  const units = ["B","KB","MB","GB"];
+  let i = 0, n = bytes;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024; i++;
+  }
+  return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+csvBtn.addEventListener("click", () => {
+  if (!lastResult) return;
+
+  const rows = [["STATUS", "FOLDER A", "FOLDER B"]];
+
+  for (const item of lastResult.same) {
+    rows.push([
+      "ISTO U OBA",
+      item.a.map(x => x.path).join(" | "),
+      item.b.map(x => x.path).join(" | ")
+    ]);
+  }
+  for (const item of lastResult.onlyA) {
+    rows.push(["SAMO U A", item.path, ""]);
+  }
+  for (const item of lastResult.onlyB) {
+    rows.push(["SAMO U B", "", item.path]);
+  }
+
+  const csv = "\uFEFF" + rows.map(r =>
+    r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
+  ).join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "izvestaj-poredjenje-slika.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+zipBtn.addEventListener("click", async () => {
+  if (!lastResult || !lastResult.onlyB.length) return;
+
+  if (typeof JSZip === "undefined") {
+    alert("ZIP biblioteka nije učitana. Proveri internet konekciju i osveži stranicu.");
+    return;
+  }
+
+  const originalText = zipBtn.textContent;
+  zipBtn.disabled = true;
+  compareBtn.disabled = true;
+  csvBtn.disabled = true;
+  progressWrap.style.display = "block";
+  bar.style.width = "0%";
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder("RAZLIKA_B_BEZ_A");
+
+    for (let i = 0; i < lastResult.onlyB.length; i++) {
+      const item = lastResult.onlyB[i];
+      statusEl.textContent = `Pakujem ${i + 1}/${lastResult.onlyB.length}: ${item.name}`;
+      folder.file(item.name, item.file);
+
+      const pct = Math.round(((i + 1) / lastResult.onlyB.length) * 60);
+      bar.style.width = pct + "%";
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    statusEl.textContent = "Kreiram ZIP fajl...";
+    const blob = await zip.generateAsync(
+      { type: "blob", compression: "STORE" },
+      meta => {
+        const pct = 60 + Math.round(meta.percent * 0.4);
+        bar.style.width = Math.min(pct, 100) + "%";
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `RAZLIKA_B_BEZ_A_${lastResult.onlyB.length}_slika.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    bar.style.width = "100%";
+    statusEl.textContent = `Gotovo — preuzeto ${lastResult.onlyB.length} fotografija koje postoje samo u Folderu B.`;
+  } catch (e) {
+    console.error(e);
+    alert("Greška pri pravljenju ZIP-a: " + e.message);
+    statusEl.textContent = "Greška pri pravljenju ZIP-a.";
+  } finally {
+    zipBtn.textContent = originalText;
+    zipBtn.disabled = !(lastResult && lastResult.onlyB.length);
+    compareBtn.disabled = !(filesA.length && filesB.length);
+    csvBtn.disabled = !lastResult;
+  }
+});
+
+</script>
+</body>
+</html>
